@@ -477,6 +477,9 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Reset file events on the new socket.
   wrapped_socket->ioHandle().resetFileEvents();
 
+  // Note down the fd for notifying the reporter.
+  os_fd_t fd = wrapped_socket->ioHandle().fdDoNotUse();
+
   // Convert ping interval to seconds as required by the manager API.
   const std::chrono::seconds ping_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(config_->pingInterval());
@@ -505,7 +508,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
     extension->reportConnection(std::string(node_id), std::string(cluster_id),
-                                std::string(tenant_id));
+                                std::string(tenant_id), fd);
   }
 }
 

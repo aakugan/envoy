@@ -15,8 +15,11 @@ class MockReverseTunnelReporter : public ReverseTunnelReporter {
 public:
   MOCK_METHOD(void, onServerInitialized, (), (override));
   MOCK_METHOD(void, reportConnectionEvent,
-              (absl::string_view, absl::string_view, absl::string_view), (override));
-  MOCK_METHOD(void, reportDisconnectionEvent, (absl::string_view, absl::string_view), (override));
+              (absl::string_view, absl::string_view, absl::string_view, const os_fd_t), (override));
+  MOCK_METHOD(void, reportDisconnectionEvent, (absl::string_view, absl::string_view, const os_fd_t),
+              (override));
+  MOCK_METHOD(void, reportGoAwayEvent, (absl::string_view, absl::string_view, const os_fd_t),
+              (override));
 };
 
 class MockReporterFactory : public ReverseTunnelReporterFactory {

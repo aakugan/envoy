@@ -1465,7 +1465,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(tenant_id)));
+                                                 testing::Eq(tenant_id), testing::Eq(100)));
     return reporter;
   }));
 

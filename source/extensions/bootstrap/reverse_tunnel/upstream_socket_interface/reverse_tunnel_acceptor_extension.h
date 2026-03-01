@@ -201,9 +201,9 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    */
   void reportConnection(absl::string_view node_id, absl::string_view cluster_id,
-                        absl::string_view tenant_id) {
+                        absl::string_view tenant_id, const os_fd_t fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id);
+      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, fd);
     }
   }
 
@@ -213,9 +213,15 @@ public:
    * @param node_id node to which the connection is made.
    * @param cluster_id cluster which the node belongs to.
    */
-  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
+  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id, const os_fd_t fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportDisconnectionEvent(node_id, cluster_id);
+      reporter_->reportDisconnectionEvent(node_id, cluster_id, fd);
+    }
+  }
+
+  void reportGoAway(absl::string_view node_id, absl::string_view cluster_id, const os_fd_t fd) {
+    if(reporter_ != nullptr) {
+      reporter_->reportGoAwayEvent(node_id, cluster_id, fd);
     }
   }
 

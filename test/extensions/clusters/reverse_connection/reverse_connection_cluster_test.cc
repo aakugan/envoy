@@ -25,8 +25,10 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/factory_context.h"
@@ -1083,11 +1085,85 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
     EXPECT_FALSE(selected_connection.has_value());
   }
 
-  // Test lifetimeCallbacks. It should return an empty OptRef.
+  // Test lifetimeCallbacks. It should return a valid OptRef.
   {
     auto lifetime_callbacks = lb.lifetimeCallbacks();
-    EXPECT_FALSE(lifetime_callbacks.has_value());
+    EXPECT_TRUE(lifetime_callbacks.has_value());
   }
+}
+
+// Test that LoadBalancer::onConnectionDraining calls SocketManager::reportGoAway which calls the
+// reporter's reportGoAwayEvent.
+TEST_F(ReverseConnectionClusterTest, OnConnectionDrainingCallsReportGoAway) {
+  using BootstrapReverseConnection::MockReporterFactory;
+  using BootstrapReverseConnection::MockReverseTunnelReporter;
+  using BootstrapReverseConnection::MOCK_REPORTER;
+  using BootstrapReverseConnection::ReverseTunnelReporterFactory;
+
+  // Configure reporter in the upstream socket interface config.
+  auto* reporter_cfg = config_.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(server_context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(testing::Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  // Set up the upstream extension (creates socket_interface_ and extension_ using config_ which
+  // now includes the reporter config).
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const int test_fd = 123;
+  addTestSocket(node_id, cluster_id);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Set up mock connection whose getSocket()->ioHandle().fdDoNotUse() returns test_fd.
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(test_fd));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  mock_socket->io_handle_ = std::move(mock_io_handle);
+  Network::ConnectionSocketPtr socket_ptr(std::move(mock_socket));
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(connection, getSocket()).WillRepeatedly(ReturnRef(socket_ptr));
+
+  Http::ConnectionPool::MockInstance pool;
+  std::vector<uint8_t> hash_key;
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id), testing::Eq(test_fd)));
+
+  lb.onConnectionDraining(pool, hash_key, connection);
 }
 
 // UpstreamReverseConnectionAddress tests

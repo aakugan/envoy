@@ -147,7 +147,7 @@ public:
   // Upstream::Cluster.
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
-  class LoadBalancer : public Upstream::LoadBalancer {
+  class LoadBalancer : public Upstream::LoadBalancer, public Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
 
@@ -169,7 +169,16 @@ public:
 
     // Lifetime tracking not implemented.
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-      return {};
+      return *this;
+    }
+
+    void onConnectionOpen(Http::ConnectionPool::Instance&, std::vector<uint8_t>&, const Network::Connection&) override {}
+
+    void onConnectionDraining(Http::ConnectionPool::Instance&, std::vector<uint8_t>&, const Network::Connection& connection) override {
+      const os_fd_t fd = connection.getSocket()->ioHandle().fdDoNotUse();
+      if(auto manager = parent_->getUpstreamSocketManager()) {
+        manager->reportGoAway(fd);
+      }
     }
 
   private:

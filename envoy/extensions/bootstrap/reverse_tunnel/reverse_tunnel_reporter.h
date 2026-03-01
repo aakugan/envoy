@@ -28,17 +28,28 @@ public:
    * @param node_id ID reported by the connecting node.
    * @param cluster_id cluster which the node belongs to.
    * @param tenant_id tenant identifier associated with the node.
+   * @param fd the fd to identify the connection to the node and the cluster.
    */
   virtual void reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                     absl::string_view tenant_id) PURE;
+                                     absl::string_view tenant_id, const os_fd_t fd) PURE;
 
   /**
    * Record that a reverse tunnel has been torn down.
    * @param node_id ID of the disconnecting node.
    * @param cluster_id cluster which the node belongs to.
+   * @param fd the fd to identify the connection to the node and the cluster.
    */
   virtual void reportDisconnectionEvent(absl::string_view node_id,
-                                        absl::string_view cluster_id) PURE;
+                                        absl::string_view cluster_id, const os_fd_t fd) PURE;
+
+
+  /**
+  * Record some go away event on the reverse tunnel -> it is about to go down shortly.
+  * @param node_id ID of the disconnecting node.
+  * @param cluster_id cluster which the node belongs to.
+  * @param fd the fd used to identify the connection to the node and the cluster.
+   */
+  virtual void reportGoAwayEvent(absl::string_view node_id, absl::string_view cluster_id, const os_fd_t fd) PURE;
 };
 
 using ReverseTunnelReporterPtr = std::unique_ptr<ReverseTunnelReporter>;

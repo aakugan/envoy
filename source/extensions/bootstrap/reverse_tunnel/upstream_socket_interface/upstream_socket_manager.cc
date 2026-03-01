@@ -314,7 +314,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     extension->updateConnectionStats(node_id, cluster_id, false /* decrement */,
                                      tenant_isolation_enabled_);
     // Report the disconnection to the extension for further action.
-    extension->reportDisconnection(node_id, cluster_id);
+    extension->reportDisconnection(node_id, cluster_id, fd);
 
     ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
               node_id, cluster_id);
@@ -498,6 +498,26 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
               miss_threshold_);
     fd_to_miss_count_.erase(fd);
     markSocketDead(fd);
+  }
+}
+
+void UpstreamSocketManager::reportGoAway(const os_fd_t fd) {
+  auto node_it = fd_to_node_map_.find(fd);
+  if (node_it == fd_to_node_map_.end()) {
+    ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_node_map_.", fd);
+    return;
+  }
+  const std::string node_id = node_it->second;
+
+  auto cluster_it = fd_to_cluster_map_.find(fd);
+  if(cluster_it == fd_to_cluster_map_.end()) {
+    ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_cluster_map_.", fd);
+    return;
+  }
+  const std::string& cluster_id = cluster_it->second;
+
+  if(auto extension = getUpstreamExtension()) {
+    extension->reportGoAway(node_id, cluster_id, fd);
   }
 }
 
