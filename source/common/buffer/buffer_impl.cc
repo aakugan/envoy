@@ -1,8 +1,10 @@
 #include "source/common/buffer/buffer_impl.h"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "source/common/common/assert.h"
 
@@ -200,6 +202,7 @@ void OwnedImpl::drainImpl(uint64_t size) {
   // Make sure to drain any zero byte fragments that might have been added as
   // sentinels for flushed data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     slices_.pop_front();
   }
 }

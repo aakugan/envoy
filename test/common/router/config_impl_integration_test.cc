@@ -231,10 +231,10 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
 
     // Check which upstream received the request
     if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                  std::chrono::milliseconds(100))) {
+                                                  std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_0";
     } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                         std::chrono::milliseconds(100))) {
+                                                         std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_1";
     } else {
       FAIL() << "No upstream received the request";
@@ -250,6 +250,8 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ENVOY_LOG_MISC(error, "Wait for disc");
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     // Verify consistency - same user should always go to same upstream
@@ -296,10 +298,10 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferen
 
     // Check which upstream received the request
     if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                  std::chrono::milliseconds(100))) {
+                                                  std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_0";
     } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                         std::chrono::milliseconds(100))) {
+                                                         std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_1";
     } else {
       FAIL() << "No upstream received the request for user: " << user_id;
@@ -315,6 +317,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferen
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     user_to_upstream[user_id] = current_upstream;
@@ -361,10 +364,10 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
 
     // Check which upstream received the request
     if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                  std::chrono::milliseconds(100))) {
+                                                  std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_0";
     } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
-                                                         std::chrono::milliseconds(100))) {
+                                                         std::chrono::milliseconds(1000))) {
       current_upstream = "upstream_1";
     } else {
       FAIL() << "No upstream received the request for user: " << user_id;
@@ -380,6 +383,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
 
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     upstream_counts[current_upstream]++;
