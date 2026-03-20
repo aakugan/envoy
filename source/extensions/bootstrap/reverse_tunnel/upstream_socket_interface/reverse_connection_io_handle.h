@@ -50,6 +50,10 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
+  Api::IoCallUint64Result read(Buffer::Instance&, absl::optional<uint64_t>) override {
+    return Api::IoCallUint64Result{ 0, Network::IoSocketError::getIoSocketEagainError() };
+  }
+
   /**
    * Override of shutdown for reverse connections.
    * When the IO handle owns the socket, ignore shutdown to avoid affecting the handed-off socket.
